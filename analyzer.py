@@ -403,7 +403,7 @@ def analyse(rows: list[tuple[str, str]]) -> dict:
         # reading ease also feeds the reading score for longer text
         if it.reading_ease is not None and it.word_count >= 6:
             it.scores["reading"] = min(it.scores["reading"], int(round(it.reading_ease)))
-        it.score = int(round(sum(it.scores.values()) / len(CATEGORIES)))
+        it.score = max(0, 100 - sum(SEVERITY_PENALTY[i.severity] for i in it.issues))
         it.issues.sort(key=lambda x: ("high", "medium", "low").index(x.severity))
 
     total = len(items)
