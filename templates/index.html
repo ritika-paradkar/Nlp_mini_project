@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>UI Text Accessibility Reviewer</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<a class="skip" href="#results">Skip to results</a>
+<header>
+  <h1>UI Text Accessibility Reviewer</h1>
+  <p>Paste your interface text — buttons, labels and messages — and get feedback on clarity, accessibility, reading level and consistency.</p>
+</header>
+
+<main>
+  <section aria-labelledby="in-h" class="card">
+    <h2 id="in-h">1. Your UI text</h2>
+    <p class="hint">One string per line. Optionally prefix a line with its type:
+      <code>button | Save</code>, <code>label | Email</code>, <code>message | Error 404</code>.
+      Lines starting with <code>#</code> are ignored.</p>
+    <label for="default-el">Type for lines without a prefix</label>
+    <select id="default-el">
+      <option value="other">Other / auto</option>
+      <option value="button">Button</option>
+      <option value="label">Field label</option>
+      <option value="message">Message</option>
+    </select>
+    <label for="text">UI strings</label>
+    <textarea id="text" rows="12" spellcheck="false"></textarea>
+    <div class="row">
+      <button id="analyze" class="primary" type="button">Analyze text</button>
+      <button id="sample" type="button">Load sample</button>
+      <button id="clear" type="button">Clear</button>
+    </div>
+    <p id="error" role="alert" class="error" hidden></p>
+  </section>
+
+  <section id="results" aria-labelledby="res-h" aria-live="polite" tabindex="-1" hidden>
+    <h2 id="res-h">2. Results</h2>
+    <div id="summary" class="card"></div>
+
+    <div class="card">
+      <div class="row filters" role="group" aria-label="Filter results">
+        <label for="f-sev">Severity</label>
+        <select id="f-sev"><option value="all">All</option><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select>
+        <label for="f-cat">Category</label>
+        <select id="f-cat"><option value="all">All</option><option value="clarity">Clarity</option><option value="accessibility">Accessibility</option><option value="reading">Reading level</option><option value="consistency">Consistency</option></select>
+        <label class="inline"><input type="checkbox" id="f-issues"> Only strings with issues</label>
+        <button id="export" type="button">Export JSON</button>
+      </div>
+      <div id="items"></div>
+    </div>
+  </section>
+</main>
+
+<footer>NLP Mini Project · Group G07 · Rule-based analysis; use as guidance alongside human review.</footer>
+<script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>
