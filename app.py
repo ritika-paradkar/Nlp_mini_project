@@ -2,6 +2,7 @@
 from flask import Flask, jsonify, render_template, request
 
 from analyzer import analyse, parse_input, ELEMENT_TYPES
+from scanner import ScanError, scan
 
 app = Flask(__name__)
 MAX_LINES = 500
@@ -30,6 +31,18 @@ def api_analyze():
     if len(rows) > MAX_LINES:
         return jsonify(error=f"Please submit at most {MAX_LINES} strings at a time."), 413
     return jsonify(analyse(rows))
+
+
+@app.post("/api/scan")
+def api_scan():
+    data = request.get_json(silent=True) or {}
+    try:
+        page = scan(data.get("url", ""))
+    except ScanError as e:
+        return jsonify(error=str(e)), 400
+    result = analyse(page["rows"])
+    result["page"] = {k: page[k] for k in ("url", "title", "lang", "page_issues", "truncated")}
+    return jsonify(result)
 
 
 if __name__ == "__main__":

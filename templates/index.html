@@ -26,11 +26,12 @@
   <!-- hero -->
   <section class="hero wrap">
     <h1>UI Text Accessibility Reviewer</h1>
-    <p class="sub">Check your buttons, labels and messages for clarity, accessibility, reading level and consistency — and get a clear fix for every issue.</p>
-    <a class="btn" href="#analyzer">Analyze your text</a>
+    <p class="sub">Enter a website address. We read its buttons, links, form labels, messages and headings, review them for clarity, accessibility, reading level and consistency, and recommend changes.</p>
+    <a class="btn" href="#analyzer">Review a website</a>
 
     <div class="hero-img" role="img" aria-label="Example: the button text “Click here” is flagged as unclear, while “Save changes” passes">
       <div class="mock">
+        <div class="mock-url">🔒 https://your-website.com</div>
         <div class="mock-row"><span class="chip">button</span><b>Click here</b><span class="badge high">High · Generic link text</span></div>
         <div class="mock-row"><span class="chip">button</span><b>Save changes</b><span class="badge ok">✓ No issues</span></div>
         <div class="mock-row"><span class="chip">message</span><b>Error 0x80070057: invalid parameter</b><span class="badge high">High · No way to fix it</span></div>
@@ -57,29 +58,48 @@
   <section id="analyzer" class="wrap">
     <h2 class="section">Analyzer</h2>
     <div class="narrow">
-      <p class="hint">Enter one string per line. Optionally start a line with its type: <code>button | Save</code>, <code>label | Email</code> or <code>message | Error 404</code> (a colon works too, and so do names like <code>Button label:</code> or <code>Error message:</code>). Lines starting with <code>#</code> are ignored.</p>
-      <label for="default-el">Type for lines without a prefix</label>
-      <select id="default-el">
-        <option value="other">Other / auto</option>
-        <option value="button">Button</option>
-        <option value="label">Field label</option>
-        <option value="message">Message</option>
-      </select>
-      <label for="text">UI strings</label>
-      <textarea id="text" rows="10" spellcheck="false" placeholder="button | Click here&#10;message | Invalid input!!! Try again"></textarea>
-      <div class="row">
-        <button id="analyze" class="btn" type="button">Analyze text</button>
-        <button id="sample" class="btn btn-ghost" type="button">Load sample</button>
-        <label class="btn btn-ghost file-btn" for="file">Upload .txt / .csv</label>
-        <input id="file" type="file" accept=".txt,.csv,.md,text/plain,text/csv" hidden>
-        <button id="clear" class="btn btn-ghost" type="button">Clear</button>
+      <div class="tabs" role="tablist" aria-label="Input method">
+        <button role="tab" id="tab-url" aria-selected="true" aria-controls="panel-url" class="tab" type="button">Scan a website</button>
+        <button role="tab" id="tab-text" aria-selected="false" aria-controls="panel-text" class="tab" type="button" tabindex="-1">Paste text</button>
       </div>
-      <p class="hint small" id="line-count">0 lines</p>
+
+      <div id="panel-url" role="tabpanel" aria-labelledby="tab-url">
+        <p class="hint">Enter the address of any public web page. We’ll collect the text users see and interact with, review it, and list the changes we recommend.</p>
+        <label for="url">Website address</label>
+        <div class="row nowrap">
+          <input id="url" type="text" inputmode="url" autocomplete="url" placeholder="https://example.com" spellcheck="false">
+          <button id="scan" class="btn" type="button">Scan website</button>
+        </div>
+        <p class="hint small">Only the page’s HTML is read. Pages that build their content with JavaScript may show little text, and private or internal addresses can’t be scanned.</p>
+      </div>
+
+      <div id="panel-text" role="tabpanel" aria-labelledby="tab-text" hidden>
+        <p class="hint">Enter one string per line. Optionally start a line with its type: <code>button | Save</code>, <code>label | Email</code> or <code>message | Error 404</code> (a colon works too, and so do names like <code>Button label:</code> or <code>Error message:</code>).</p>
+        <label for="default-el">Type for lines without a prefix</label>
+        <select id="default-el">
+          <option value="other">Other / auto</option>
+          <option value="button">Button</option>
+          <option value="label">Field label</option>
+          <option value="message">Message</option>
+        </select>
+        <label for="text">UI strings</label>
+        <textarea id="text" rows="10" spellcheck="false" placeholder="button | Click here&#10;message | Invalid input!!! Try again"></textarea>
+        <div class="row">
+          <button id="analyze" class="btn" type="button">Analyze text</button>
+          <button id="sample" class="btn btn-ghost" type="button">Load sample</button>
+          <label class="btn btn-ghost file-btn" for="file">Upload .txt / .csv</label>
+          <input id="file" type="file" accept=".txt,.csv,.md,text/plain,text/csv" hidden>
+          <button id="clear" class="btn btn-ghost" type="button">Clear</button>
+        </div>
+        <p class="hint small" id="line-count">0 lines</p>
+      </div>
       <p id="error" role="alert" class="error" hidden></p>
+      <p id="busy" role="status" class="hint" hidden>Scanning the website…</p>
     </div>
 
     <div id="results" aria-live="polite" tabindex="-1" hidden>
       <h2 class="section">Results</h2>
+      <div id="page-info"></div>
       <div id="summary"></div>
       <div class="row filters" role="group" aria-label="Filter results">
         <label for="f-sev">Severity</label>
@@ -104,9 +124,11 @@
   <section id="how" class="wrap">
     <h2 class="section">How it works</h2>
     <div class="narrow prose">
-      <p>The reviewer is a rule-based NLP engine, so it runs offline with no model downloads. Each string is tokenised into words and sentences, then checked against lexicons and patterns for each dimension.</p>
+      <p><b>1. Scan.</b> The server downloads the page’s HTML (blocking private networks) and parses it to extract buttons, links, form labels and placeholders, headings, error or alert messages, image descriptions and paragraphs. It also records page-level problems such as images without alt text, form fields without labels, missing page language and disabled zoom.</p>
+      <p><b>2. Analyse.</b> The reviewer is a rule-based NLP engine, so it runs offline with no model downloads. Each string is tokenised into words and sentences, then checked against lexicons and patterns for each dimension.</p>
       <p><b>Clarity</b> uses word lists (jargon, vague actions, abbreviations), regular-expression patterns for passive voice, negatives and error codes, and length limits per element type. <b>Accessibility</b> rules follow WCAG ideas such as Sensory Characteristics and descriptive link text.</p>
       <p><b>Reading level</b> uses the Flesch Reading Ease and Flesch-Kincaid Grade formulas with a built-in syllable counter. <b>Consistency</b> compares all strings together to catch term variants, mixed capitalisation and mixed punctuation.</p>
+      <p><b>3. Recommend.</b> Every issue comes with a suggestion, many strings get an automatic rewrite, and the whole report can be exported.</p>
       <p>This is guidance to support — not replace — human and assistive-technology testing.</p>
     </div>
   </section>

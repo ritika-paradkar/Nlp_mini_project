@@ -14,7 +14,7 @@ import re
 from collections import defaultdict
 from dataclasses import dataclass, field, asdict
 
-ELEMENT_TYPES = ("button", "label", "message", "other")
+ELEMENT_TYPES = ("button", "link", "label", "heading", "message", "alt", "other")
 
 WORD_RE = re.compile(r"[A-Za-z]+(?:['’-][A-Za-z]+)*")
 SENTENCE_RE = re.compile(r"[^.!?]+[.!?]*")
@@ -98,6 +98,7 @@ class ItemResult:
     grade: float | None
     reading_label: str
     rewrite: str = ""
+    where: str = ""
     scores: dict = field(default_factory=dict)
     score: int = 100
     issues: list = field(default_factory=list)
@@ -259,6 +260,10 @@ def check_item(text: str, element: str) -> list[Issue]:
     if BLAME.search(text):
         add("accessibility", "medium", "Blames the user, which harms trust and is harder for people with cognitive disabilities.", "Describe what happened neutrally and what to do next.", "blame")
 
+    if element == "alt" and len(text) > 125:
+        add("accessibility", "low", f"Alt text is {len(text)} characters long; screen readers handle roughly 125 well.",
+            "Keep alt text short; describe long content in the page text instead.", "long-alt")
+
     # ---- message-specific guidance
     if element == "message":
         is_error = bool(re.search(r"\b(?:error|failed|fail|invalid|cannot|can't|couldn't|unable|wrong|problem|denied|not found|incorrect|unauthori[sz]ed)\b", low))
@@ -310,7 +315,7 @@ def check_consistency(items: list[ItemResult]) -> list[tuple[int, Issue]]:
                                          "Pick one term and use it everywhere.", "term-variants")))
 
     # 2. capitalisation style by element type
-    for element in ("button", "label"):
+    for element in ("button", "link", "label", "heading"):
         group = [it for it in items if it.element == element and case_style(it.text) in ("title", "sentence", "upper", "lower", "mixed")]
         styles: dict[str, list[int]] = defaultdict(list)
         for it in group:
@@ -364,6 +369,9 @@ PHRASE_FIXES = [
     (re.compile(r"\bit is important to note that\s*", re.I), ""),
     (re.compile(r"\bkindly\s+", re.I), ""),
 ]
+# one-for-one swaps that never change the meaning; the rest of JARGON is only advised on, not auto-applied
+SAFE_SWAPS = {"utilize": "use", "initiate": "start", "execute": "run", "proceed": "continue", "functionality": "feature",
+              "terminate": "end", "terminated": "ended", "legacy": "old", "persist": "save", "module": "section", "navigate": "go"}
 BUTTON_FIXES = {"submit": "Send", "ok": "Got it", "okay": "Got it", "yes": "Yes, continue", "no": "No, go back",
                 "go": "Continue", "done": "Finish", "next": "Next step"}
 
@@ -379,13 +387,8 @@ def suggest_rewrite(text: str, element: str) -> str:
     out = text
     for rx, repl in PHRASE_FIXES:
         out = rx.sub(repl, out)
-    out = re.sub(
-        r"[A-Za-z]+",
-        lambda m: _match_case(m.group(0), JARGON[m.group(0).lower()])
-        if m.group(0).lower() in JARGON and " " not in JARGON[m.group(0).lower()] and "/" not in JARGON[m.group(0).lower()]
-        else m.group(0),
-        out,
-    )
+    out = re.sub(r"[A-Za-z]+", lambda m: _match_case(m.group(0), SAFE_SWAPS[m.group(0).lower()]) if m.group(0).lower() in SAFE_SWAPS else m.group(0), out)
+    out = re.sub(r"\b(\w+)(\s+\1\b)+", r"\1", out, flags=re.I)        # collapse accidental repeated words
     letters = re.sub(r"[^A-Za-z]", "", out)
     if len(letters) > 3 and letters.isupper():
         out = out.capitalize() if element in ("button", "label") else out[:1].upper() + out[1:].lower()
@@ -430,14 +433,15 @@ def parse_input(raw: str, default_element: str = "other") -> list[tuple[str, str
     return rows
 
 
-def analyse(rows: list[tuple[str, str]]) -> dict:
+def analyse(rows: list[tuple]) -> dict:
+    """rows: (text, element) or (text, element, where) tuples."""
     items: list[ItemResult] = []
-    for idx, (text, element) in enumerate(rows, 1):
+    for idx, (text, element, *rest) in enumerate(rows, 1):
         if element not in ELEMENT_TYPES:
             element = "other"
         ease, grade = readability(text)
         n = len(words(text))
-        item = ItemResult(id=idx, text=text, element=element, word_count=n,
+        item = ItemResult(id=idx, text=text, element=element, word_count=n, where=rest[0] if rest else "",
                           reading_ease=ease, grade=grade, reading_label=reading_label(ease))
         item.issues = check_item(text, element)
         item.rewrite = suggest_rewrite(text, element)

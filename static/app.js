@@ -37,13 +37,24 @@ async function analyze() {
       body: JSON.stringify({ text, default_element: $("default-el").value }) });
     const data = await r.json();
     if (!r.ok) throw new Error(data.error || "Analysis failed.");
-    last = data; render();
+    last = data; last.page = null; render();
     const res = $("results"); res.hidden = false; res.focus(); res.scrollIntoView({ behavior: "smooth" });
   } catch (e) { showError(e.message); }
   finally { $("analyze").disabled = false; }
 }
 
+function renderPage() {
+  const pg = last.page, box = $("page-info");
+  if (!pg) { box.innerHTML = ""; return; }
+  const li = pg.page_issues.map((i) => `<li class="${i.severity}"><span class="sev ${i.severity}">${i.severity}</span> ${esc(i.message)}
+    <span class="fix">Suggestion: ${esc(i.suggestion)}</span></li>`).join("");
+  box.innerHTML = `<div class="pageinfo"><h3>${esc(pg.title || "Untitled page")}</h3><p class="url">${esc(pg.url)}${pg.lang ? " · lang=" + esc(pg.lang) : ""}</p>
+    <b>Page-level checks</b>${li ? `<ul>${li}</ul>` : `<p class="ok-msg">✓ No page-level problems found</p>`}
+    ${pg.truncated ? `<p class="hint small">Only the first ${last.items.length} strings were reviewed.</p>` : ""}</div>`;
+}
+
 function render() {
+  renderPage();
   const s = last.summary;
   const cats = Object.entries(CATS).map(([k, label]) => `
     <div class="stat"><span>${label}</span><b class="${tone(s.categories[k])}">${s.categories[k]}</b>
@@ -76,10 +87,10 @@ function renderItems() {
       : `<p class="ok-msg">✓ No issues found</p>`;
     const fix = it.rewrite ? `<div class="rewrite"><b>Suggested rewrite</b><span>${esc(it.rewrite)}</span>
       <button type="button" class="btn btn-ghost" data-copy="${esc(it.rewrite)}">Copy</button></div>` : "";
-    const read = it.reading_ease != null ? `Reading ease ${it.reading_ease} (${esc(it.reading_label)}) · grade ${it.grade}` : "";
+    const read = it.reading_ease != null && it.word_count >= 6 ? `Reading ease ${it.reading_ease} (${esc(it.reading_label)}) · grade ${it.grade}` : "";
     return `<article class="item"><div class="item-head"><span class="text">${esc(it.text)}</span>
       <span><span class="tag">${it.element}</span> <b class="${tone(it.score)}">${it.score}/100</b></span></div>
-      <div class="meta">${it.word_count} word${it.word_count === 1 ? "" : "s"} · ${read}</div>${list}${fix}</article>`;
+      <div class="meta">${it.where ? `<span class="where">${esc(it.where)}</span> · ` : ""}${it.word_count} word${it.word_count === 1 ? "" : "s"}${read ? " · " + read : ""}</div>${list}${fix}</article>`;
   }).join("");
   $("items").innerHTML = html || "<p>No strings match the current filters.</p>";
 }
@@ -114,8 +125,8 @@ $("copy-fixes").onclick = () => {
 const csvCell = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
 $("export-csv").onclick = () => {
   if (!last) return;
-  const head = ["#", "Type", "Text", "Score", "Clarity", "Accessibility", "Reading", "Consistency", "Reading ease", "Grade", "Issues", "Suggested rewrite"];
-  const rows = last.items.map((i) => [i.id, i.element, i.text, i.score, i.scores.clarity, i.scores.accessibility, i.scores.reading,
+  const head = ["#", "Type", "Found in", "Text", "Score", "Clarity", "Accessibility", "Reading", "Consistency", "Reading ease", "Grade", "Issues", "Suggested rewrite"];
+  const rows = last.items.map((i) => [i.id, i.element, i.where, i.text, i.score, i.scores.clarity, i.scores.accessibility, i.scores.reading,
     i.scores.consistency, i.reading_ease, i.grade, i.issues.map((x) => `[${x.severity}] ${x.message}`).join(" | "), i.rewrite]);
   const csv = "\ufeff" + [head, ...rows].map((r) => r.map(csvCell).join(",")).join("\r\n");
   const a = document.createElement("a");
@@ -142,3 +153,32 @@ $("text").addEventListener("input", updateCount);
 $("sample").addEventListener("click", updateCount);
 $("clear").addEventListener("click", updateCount);
 updateCount();
+
+// ---- website scan + tabs
+function selectTab(which) {
+  const url = which === "url";
+  $("tab-url").setAttribute("aria-selected", url); $("tab-text").setAttribute("aria-selected", !url);
+  $("tab-url").tabIndex = url ? 0 : -1; $("tab-text").tabIndex = url ? -1 : 0;
+  $("panel-url").hidden = !url; $("panel-text").hidden = url; showError("");
+}
+$("tab-url").onclick = () => selectTab("url");
+$("tab-text").onclick = () => selectTab("text");
+document.querySelector(".tabs").addEventListener("keydown", (e) => {
+  if (e.key === "ArrowRight" || e.key === "ArrowLeft") { const t = $("tab-url").getAttribute("aria-selected") === "true" ? "text" : "url"; selectTab(t); $("tab-" + t).focus(); }
+});
+async function scan() {
+  showError("");
+  const url = $("url").value.trim();
+  if (!url) return showError("Please enter a website address.");
+  $("scan").disabled = true; $("busy").hidden = false;
+  try {
+    const r = await fetch("/api/scan", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url }) });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || "Scan failed.");
+    last = data; render();
+    const res = $("results"); res.hidden = false; res.focus(); res.scrollIntoView({ behavior: "smooth" });
+  } catch (e) { showError(e.message); }
+  finally { $("scan").disabled = false; $("busy").hidden = true; }
+}
+$("scan").onclick = scan;
+$("url").addEventListener("keydown", (e) => { if (e.key === "Enter") scan(); });

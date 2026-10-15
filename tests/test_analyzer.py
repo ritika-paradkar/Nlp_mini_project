@@ -64,3 +64,8 @@ def test_rewrites():
     assert suggest_rewrite("Provide it prior to proceeding.", "message") == "Provide it before proceeding."
     assert suggest_rewrite("Save changes", "button") == ""
     assert analyse([("CANCEL", "button")])["items"][0]["rewrite"] == "Cancel"
+
+
+def test_rewrite_is_conservative():
+    assert suggest_rewrite("Invalid parameter", "message") == ""
+    assert suggest_rewrite("Please utilize the tool", "message") == "Please use the tool"
