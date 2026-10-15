@@ -1,3 +1,0 @@
-# Optional: lets the scanner run a page's JavaScript (needed for apps like ChatGPT).
-# After installing, run once:  python -m playwright install chromium
-playwright>=1.40

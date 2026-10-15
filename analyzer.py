@@ -434,7 +434,7 @@ def parse_input(raw: str, default_element: str = "other") -> list[tuple[str, str
 
 
 def analyse(rows: list[tuple]) -> dict:
-    """rows: (text, element) or (text, element, where) tuples."""
+    """rows: (text, element[, where[, extra_issues]]) tuples."""
     items: list[ItemResult] = []
     for idx, (text, element, *rest) in enumerate(rows, 1):
         if element not in ELEMENT_TYPES:
@@ -444,6 +444,8 @@ def analyse(rows: list[tuple]) -> dict:
         item = ItemResult(id=idx, text=text, element=element, word_count=n, where=rest[0] if rest else "",
                           reading_ease=ease, grade=grade, reading_label=reading_label(ease))
         item.issues = check_item(text, element)
+        if len(rest) > 1:
+            item.issues.extend(rest[1])             # extra findings supplied by the caller (e.g. contrast from a screenshot)
         item.rewrite = suggest_rewrite(text, element)
         ri = reading_issue(element, ease, grade, n)
         if ri:

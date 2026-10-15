@@ -30,7 +30,7 @@
   <!-- hero -->
   <section class="hero wrap">
     <h1>UI Text Accessibility Reviewer</h1>
-    <p class="sub">Enter a website address. We read its buttons, links, form labels, messages and headings, review them for clarity, accessibility, reading level and consistency, and recommend changes.</p>
+    <p class="sub">Enter a website address or upload a screenshot. We read the buttons, links, labels and messages, review them for clarity, accessibility, reading level and consistency, and recommend changes.</p>
     <a class="btn" href="#analyzer">Review a website</a>
 
     <div class="hero-img" role="img" aria-label="Example: the button text “Click here” is flagged as unclear, while “Save changes” passes">
@@ -64,6 +64,7 @@
     <div class="narrow">
       <div class="tabs" role="tablist" aria-label="Input method">
         <button role="tab" id="tab-url" aria-selected="true" aria-controls="panel-url" class="tab" type="button">Scan a website</button>
+        <button role="tab" id="tab-shot" aria-selected="false" aria-controls="panel-shot" class="tab" type="button" tabindex="-1">Upload screenshot</button>
         <button role="tab" id="tab-text" aria-selected="false" aria-controls="panel-text" class="tab" type="button" tabindex="-1">Paste text</button>
       </div>
 
@@ -80,6 +81,25 @@
           <button type="button" class="linkbtn" data-demo="good-site">a well written site</button> ·
           <button type="button" class="linkbtn" data-demo="js-site">a JavaScript-built app</button></p>
         <p class="hint small">If a page has little text in its HTML, we automatically open it in a headless browser so its JavaScript runs. Pages behind a login show only their public part, and private or internal addresses can’t be scanned.</p>
+      </div>
+
+      <div id="panel-shot" role="tabpanel" aria-labelledby="tab-shot" hidden>
+        <p class="hint">Can’t scan a site, or want to review a design or app screen? Add a screenshot. We read the text in the picture, check it for clarity, accessibility, reading level and consistency, and also measure <strong>colour contrast</strong> and <strong>text size</strong>.</p>
+        <div id="drop" class="drop" tabindex="0" role="button" aria-label="Choose or drop a screenshot">
+          <input id="shot-file" type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/bmp" hidden>
+          <p class="drop-main"><strong>Drop a screenshot here</strong>, paste it with <kbd>Ctrl</kbd>+<kbd>V</kbd>, or <u>choose a file</u></p>
+          <p class="hint small">PNG, JPG, WebP, GIF or BMP · up to 10 MB</p>
+          <img id="shot-preview" alt="Preview of the chosen screenshot" hidden>
+          <p id="shot-name" class="hint small" hidden></p>
+        </div>
+        <label for="shot-scale">Screenshot type</label>
+        <select id="shot-scale">
+          <option value="auto">Automatic</option>
+          <option value="1">Normal screen (1×)</option>
+          <option value="2">High-resolution / retina or phone (2×)</option>
+        </select>
+        <div class="row"><button id="shot-go" class="btn" type="button" disabled>Review screenshot</button>
+          <button id="shot-demo" class="btn btn-ghost" type="button">Try a sample screenshot</button></div>
       </div>
 
       <div id="panel-text" role="tabpanel" aria-labelledby="tab-text" hidden>
@@ -103,30 +123,38 @@
         <p class="hint small" id="line-count">0 lines</p>
       </div>
       <p id="error" role="alert" class="error" hidden></p>
-      <p id="busy" role="status" class="hint" hidden>Scanning the website… pages that need JavaScript can take up to 30 seconds.</p>
+      <p id="busy" role="status" class="hint" hidden>Working… websites that need JavaScript and screenshots can take up to 30 seconds.</p>
+      <p id="error-actions" hidden><button id="to-shot" class="btn btn-ghost" type="button">Review a screenshot of the site instead</button></p>
     </div>
 
     <div id="results" aria-live="polite" tabindex="-1" hidden>
       <h2 class="section">Results</h2>
+      <div id="verdict"></div>
+      <div id="shot-view"></div>
       <div id="page-info"></div>
       <div id="top-fixes"></div>
-      <div id="summary"></div>
+
+      <h3 class="list-title">All text, one by one</h3>
       <div class="row filters" role="group" aria-label="Filter results">
-        <label for="f-sev">Severity</label>
-        <select id="f-sev"><option value="all">All</option><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select>
-        <label for="f-cat">Category</label>
-        <select id="f-cat"><option value="all">All</option><option value="clarity">Clarity</option><option value="accessibility">Accessibility</option><option value="reading">Reading level</option><option value="consistency">Consistency</option></select>
-        <label for="f-sort">Sort</label>
-        <select id="f-sort"><option value="order">Original order</option><option value="worst">Lowest score first</option><option value="best">Highest score first</option></select>
+        <label for="f-sev">Show</label>
+        <select id="f-sev"><option value="all">All severities</option><option value="high">High only</option><option value="medium">Medium only</option><option value="low">Low only</option></select>
+        <label for="f-cat" class="sr">Category</label>
+        <select id="f-cat"><option value="all">All categories</option><option value="clarity">Clarity</option><option value="accessibility">Accessibility</option><option value="reading">Reading level</option><option value="consistency">Consistency</option></select>
+        <label for="f-sort" class="sr">Sort</label>
+        <select id="f-sort"><option value="order">Original order</option><option value="worst">Worst first</option><option value="best">Best first</option></select>
         <label class="inline"><input type="checkbox" id="f-issues"> Only strings with issues</label>
+        <button id="expand" class="btn btn-ghost btn-sm" type="button">Expand all</button>
+        <button id="collapse" class="btn btn-ghost btn-sm" type="button">Collapse all</button>
       </div>
+      <div id="items"></div>
+
       <div class="row export-row">
         <button id="copy-fixes" class="btn btn-ghost" type="button">Copy all suggested rewrites</button>
         <button id="export-csv" class="btn btn-ghost" type="button">Export CSV</button>
         <button id="export" class="btn btn-ghost" type="button">Export JSON</button>
         <button id="print" class="btn btn-ghost" type="button">Print / Save PDF</button>
+        <button id="to-text" class="btn btn-ghost" type="button" hidden>Edit the extracted text</button>
       </div>
-      <div id="items"></div>
     </div>
   </section>
 
@@ -134,7 +162,8 @@
   <section id="how" class="wrap">
     <h2 class="section">How it works</h2>
     <div class="narrow prose">
-      <p><b>1. Scan.</b> The server downloads the page’s HTML (blocking private networks) and parses it to extract buttons, links, form labels and placeholders, headings, error or alert messages, image descriptions and paragraphs. It also records page-level problems such as images without alt text, form fields without labels, missing page language and disabled zoom.</p>
+      <p><b>1. Read.</b> For a website address, the server downloads the page (blocking private networks), runs its JavaScript in a headless browser when needed, and extracts buttons, links, form labels and placeholders, headings, error or alert messages, image descriptions and paragraphs. It also records page-level problems such as images without alt text, form fields without labels, missing page language and disabled zoom.</p>
+      <p><b>Screenshots</b> go through OCR (text recognition). For each piece of text we measure its size and its colour contrast against its own background, then review the words in the same way.</p>
       <p><b>2. Analyse.</b> The reviewer is a rule-based NLP engine, so it runs offline with no model downloads. Each string is tokenised into words and sentences, then checked against lexicons and patterns for each dimension.</p>
       <p><b>Clarity</b> uses word lists (jargon, vague actions, abbreviations), regular-expression patterns for passive voice, negatives and error codes, and length limits per element type. <b>Accessibility</b> rules follow WCAG ideas such as Sensory Characteristics and descriptive link text.</p>
       <p><b>Reading level</b> uses the Flesch Reading Ease and Flesch-Kincaid Grade formulas with a built-in syllable counter. <b>Consistency</b> compares all strings together to catch term variants, mixed capitalisation and mixed punctuation.</p>

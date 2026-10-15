@@ -1,2 +1,9 @@
 Flask>=3.0
 pytest>=8.0
+# Website scanning of JavaScript-built pages (also run: python -m playwright install chromium)
+playwright>=1.40
+# Screenshot review (text recognition + image measuring). Models are bundled; no extra download.
+rapidocr>=3.0
+onnxruntime>=1.18
+pillow>=10.0
+numpy>=1.26

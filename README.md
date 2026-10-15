@@ -5,15 +5,25 @@ Group G07 – NLP Mini Project. A web app that evaluates UI labels, buttons and 
 
 ## Run
 ```bash
-pip install -r requirements.txt
-python app.py          # http://localhost:5000
-pytest                 # run tests
+python -m pip install -r requirements.txt
+python -m playwright install chromium     # one-time, ~150 MB, only needed for JavaScript-built sites
+python app.py                             # http://localhost:5000
+python -m pytest                          # run tests
 ```
+The core app (text review and plain-HTML site scans) needs only Flask. Playwright adds JavaScript-built pages;
+rapidocr + onnxruntime + pillow + numpy add screenshot review. Missing add-ons show a helpful message instead of crashing.
 
 ## Website scan
-Enter a URL on the **Scan a website** tab. `scanner.py` downloads the page (private/internal addresses are blocked), extracts buttons, links, form labels/placeholders, headings, alert messages, alt text and paragraphs, and also reports page-level problems (missing alt text, unlabeled fields, no `lang`, skipped headings, disabled zoom, duplicate link text). Everything is then reviewed by the analyzer below. If a page has little text in its HTML (single-page apps such as ChatGPT), the scanner automatically opens it in headless Chromium so its JavaScript runs; tick “Run the page’s JavaScript first” to always do this. This needs the optional add-on: `python -m pip install -r requirements-js.txt` then `python -m playwright install chromium`. Every request the browser makes is checked against the same internal-address block. Pages behind a login show only their public part. API: `POST /api/scan` with `{"url": "example.com"}`. For local testing of internal addresses set `UITR_ALLOW_PRIVATE=1`.
+Enter a URL on the **Scan a website** tab. `scanner.py` downloads the page (private/internal addresses are blocked), extracts buttons, links, form labels/placeholders, headings, alert messages, alt text and paragraphs, and also reports page-level problems (missing alt text, unlabeled fields, no `lang`, skipped headings, disabled zoom, duplicate link text). Everything is then reviewed by the analyzer below. If a page has little text in its HTML (single-page apps such as ChatGPT), the scanner automatically opens it in headless Chromium so its JavaScript runs; tick “Run the page’s JavaScript first” to always do this. This needs Playwright and its browser (see Run). Every request the browser makes is checked against the same internal-address block. Pages behind a login show only their public part. API: `POST /api/scan` with `{"url": "example.com"}`. For local testing of internal addresses set `UITR_ALLOW_PRIVATE=1`.
 
 Built-in demos (no internet needed): on the Scan tab click “a badly written site” (scores ~40) or “a well written site” (~100). The site score is half the average text score and half the page-level checks.
+
+## Screenshot review
+On the **Upload screenshot** tab, drop, paste (Ctrl+V) or choose an image. `screenshot.py` reads the text with OCR (RapidOCR), merges wrapped
+lines into paragraphs, guesses what each piece is (button, heading, message…), and measures each text area from its own pixels:
+**colour contrast** (WCAG ratio against the local background, with a suggested colour) and **text size**. The words then go through the
+same language reviewer as the website scan. Results show the screenshot with clickable boxes around every piece of text.
+Contrast and size are estimates, so check surprises by eye. API: `POST /api/screenshot` (multipart `image`, optional `scale` = auto|1|2).
 
 ## How it works (`analyzer.py`)
 | Dimension | Techniques |
