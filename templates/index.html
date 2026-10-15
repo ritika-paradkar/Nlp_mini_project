@@ -4,57 +4,108 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>UI Text Accessibility Reviewer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-<a class="skip" href="#results">Skip to results</a>
-<header>
-  <h1>UI Text Accessibility Reviewer</h1>
-  <p>Paste your interface text — buttons, labels and messages — and get feedback on clarity, accessibility, reading level and consistency.</p>
+<a class="skip" href="#analyzer">Skip to analyzer</a>
+
+<header class="nav">
+  <a class="site" href="#top">UI Text Reviewer</a>
+  <nav aria-label="Main">
+    <a href="#top">Home</a>
+    <a href="#checks">What we check</a>
+    <a href="#analyzer">Analyzer</a>
+    <a href="#how">How it works</a>
+    <a class="btn btn-sm" href="#analyzer">Try it</a>
+  </nav>
 </header>
 
-<main>
-  <section aria-labelledby="in-h" class="card">
-    <h2 id="in-h">1. Your UI text</h2>
-    <p class="hint">One string per line. Optionally prefix a line with its type:
-      <code>button | Save</code>, <code>label | Email</code>, <code>message | Error 404</code>.
-      Lines starting with <code>#</code> are ignored.</p>
-    <label for="default-el">Type for lines without a prefix</label>
-    <select id="default-el">
-      <option value="other">Other / auto</option>
-      <option value="button">Button</option>
-      <option value="label">Field label</option>
-      <option value="message">Message</option>
-    </select>
-    <label for="text">UI strings</label>
-    <textarea id="text" rows="12" spellcheck="false"></textarea>
-    <div class="row">
-      <button id="analyze" class="primary" type="button">Analyze text</button>
-      <button id="sample" type="button">Load sample</button>
-      <button id="clear" type="button">Clear</button>
+<main id="top">
+  <!-- hero -->
+  <section class="hero wrap">
+    <h1>UI Text Accessibility Reviewer</h1>
+    <p class="sub">Check your buttons, labels and messages for clarity, accessibility, reading level and consistency — and get a clear fix for every issue.</p>
+    <a class="btn" href="#analyzer">Analyze your text</a>
+
+    <div class="hero-img" role="img" aria-label="Example: the button text “Click here” is flagged as unclear, while “Save changes” passes">
+      <div class="mock">
+        <div class="mock-row"><span class="chip">button</span><b>Click here</b><span class="badge high">High · Generic link text</span></div>
+        <div class="mock-row"><span class="chip">button</span><b>Save changes</b><span class="badge ok">✓ No issues</span></div>
+        <div class="mock-row"><span class="chip">message</span><b>Error 0x80070057: invalid parameter</b><span class="badge high">High · No way to fix it</span></div>
+        <div class="mock-row"><span class="chip">label</span><b>Email address</b><span class="badge ok">✓ No issues</span></div>
+        <div class="mock-score"><span>Overall score</span><strong>78<small>/100</small></strong></div>
+      </div>
     </div>
-    <p id="error" role="alert" class="error" hidden></p>
   </section>
 
-  <section id="results" aria-labelledby="res-h" aria-live="polite" tabindex="-1" hidden>
-    <h2 id="res-h">2. Results</h2>
-    <div id="summary" class="card"></div>
+  <!-- three cards -->
+  <section id="checks" class="wrap">
+    <h2 class="section">What we check</h2>
+    <div class="cards">
+      <article><div class="tile t1" aria-hidden="true">Aa</div><h3>Clarity</h3>
+        <p>Vague buttons like “Submit”, jargon, error codes, passive voice, double negatives and messages that don’t say how to fix the problem.</p></article>
+      <article><div class="tile t2" aria-hidden="true">♿︎</div><h3>Accessibility</h3>
+        <p>“Click here” links, colour-only or position-only instructions, ALL CAPS, emoji, symbol-only text and user-blaming wording.</p></article>
+      <article><div class="tile t3" aria-hidden="true">≡</div><h3>Reading level &amp; consistency</h3>
+        <p>Flesch reading scores, plus a cross-check of terms, capitalisation and punctuation, so “Log in” isn’t “Sign in” on the next screen.</p></article>
+    </div>
+  </section>
 
-    <div class="card">
+  <!-- analyzer -->
+  <section id="analyzer" class="wrap">
+    <h2 class="section">Analyzer</h2>
+    <div class="narrow">
+      <p class="hint">Enter one string per line. Optionally start a line with its type: <code>button | Save</code>, <code>label | Email</code> or <code>message | Error 404</code>. Lines starting with <code>#</code> are ignored.</p>
+      <label for="default-el">Type for lines without a prefix</label>
+      <select id="default-el">
+        <option value="other">Other / auto</option>
+        <option value="button">Button</option>
+        <option value="label">Field label</option>
+        <option value="message">Message</option>
+      </select>
+      <label for="text">UI strings</label>
+      <textarea id="text" rows="10" spellcheck="false" placeholder="button | Click here&#10;message | Invalid input!!! Try again"></textarea>
+      <div class="row">
+        <button id="analyze" class="btn" type="button">Analyze text</button>
+        <button id="sample" class="btn btn-ghost" type="button">Load sample</button>
+        <button id="clear" class="btn btn-ghost" type="button">Clear</button>
+      </div>
+      <p id="error" role="alert" class="error" hidden></p>
+    </div>
+
+    <div id="results" aria-live="polite" tabindex="-1" hidden>
+      <h2 class="section">Results</h2>
+      <div id="summary"></div>
       <div class="row filters" role="group" aria-label="Filter results">
         <label for="f-sev">Severity</label>
         <select id="f-sev"><option value="all">All</option><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select>
         <label for="f-cat">Category</label>
         <select id="f-cat"><option value="all">All</option><option value="clarity">Clarity</option><option value="accessibility">Accessibility</option><option value="reading">Reading level</option><option value="consistency">Consistency</option></select>
         <label class="inline"><input type="checkbox" id="f-issues"> Only strings with issues</label>
-        <button id="export" type="button">Export JSON</button>
+        <button id="export" class="btn btn-ghost" type="button">Export JSON</button>
       </div>
       <div id="items"></div>
     </div>
   </section>
+
+  <!-- how it works -->
+  <section id="how" class="wrap">
+    <h2 class="section">How it works</h2>
+    <div class="narrow prose">
+      <p>The reviewer is a rule-based NLP engine, so it runs offline with no model downloads. Each string is tokenised into words and sentences, then checked against lexicons and patterns for each dimension.</p>
+      <p><b>Clarity</b> uses word lists (jargon, vague actions, abbreviations), regular-expression patterns for passive voice, negatives and error codes, and length limits per element type. <b>Accessibility</b> rules follow WCAG ideas such as Sensory Characteristics and descriptive link text.</p>
+      <p><b>Reading level</b> uses the Flesch Reading Ease and Flesch-Kincaid Grade formulas with a built-in syllable counter. <b>Consistency</b> compares all strings together to catch term variants, mixed capitalisation and mixed punctuation.</p>
+      <p>This is guidance to support — not replace — human and assistive-technology testing.</p>
+    </div>
+  </section>
 </main>
 
-<footer>NLP Mini Project · Group G07 · Rule-based analysis; use as guidance alongside human review.</footer>
+<footer class="wrap">
+  <span>UI Text Reviewer</span>
+  <span>NLP Mini Project · Group G07</span>
+</footer>
 <script src="{{ url_for('static', filename='app.js') }}"></script>
 </body>
 </html>
