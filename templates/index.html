@@ -18,6 +18,10 @@
     <a href="#checks">What we check</a>
     <a href="#analyzer">Analyzer</a>
     <a href="#how">How it works</a>
+    <span class="sizer" role="group" aria-label="Text size">
+      <button type="button" id="size-down" aria-label="Smaller text">A−</button>
+      <button type="button" id="size-up" aria-label="Larger text">A+</button>
+    </span>
     <a class="btn btn-sm" href="#analyzer">Try it</a>
   </nav>
 </header>
@@ -100,6 +104,7 @@
     <div id="results" aria-live="polite" tabindex="-1" hidden>
       <h2 class="section">Results</h2>
       <div id="page-info"></div>
+      <div id="top-fixes"></div>
       <div id="summary"></div>
       <div class="row filters" role="group" aria-label="Filter results">
         <label for="f-sev">Severity</label>

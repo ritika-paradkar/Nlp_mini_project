@@ -46,15 +46,30 @@ async function analyze() {
 function renderPage() {
   const pg = last.page, box = $("page-info");
   if (!pg) { box.innerHTML = ""; return; }
-  const li = pg.page_issues.map((i) => `<li class="${i.severity}"><span class="sev ${i.severity}">${i.severity}</span> ${esc(i.message)}
-    <span class="fix">Suggestion: ${esc(i.suggestion)}</span></li>`).join("");
-  box.innerHTML = `<div class="pageinfo"><h3>${esc(pg.title || "Untitled page")}</h3><p class="url">${esc(pg.url)}${pg.lang ? " · lang=" + esc(pg.lang) : ""}</p>
-    <b>Page-level checks</b>${li ? `<ul>${li}</ul>` : `<p class="ok-msg">✓ No page-level problems found</p>`}
+  const order = { high: 0, medium: 1, low: 2 };
+  const issues = pg.page_issues.slice().sort((x, y) => order[x.severity] - order[y.severity]);
+  const li = issues.map((i) => `<li class="${i.severity}"><div class="li-head"><span class="sev ${i.severity}">${i.severity}</span> <strong>${esc(i.message)}</strong></div>
+    ${i.detail ? `<p class="detail">${esc(i.detail)}</p>` : ""}<p class="fixline"><b>Fix:</b> ${esc(i.suggestion)}</p></li>`).join("");
+  box.innerHTML = `${pg.warning ? `<div class="warn" role="alert"><b>Heads up:</b> ${esc(pg.warning)}</div>` : ""}
+    <div class="pageinfo"><h3>${esc(pg.title || "Untitled page")}</h3><p class="url">${esc(pg.url)}${pg.lang ? " · language: " + esc(pg.lang) : ""}</p>
+    <h4>Page-level checks <span class="count">${issues.length}</span></h4>${li ? `<ul>${li}</ul>` : `<p class="ok-msg">✓ No page-level problems found</p>`}
     ${pg.truncated ? `<p class="hint small">Only the first ${last.items.length} strings were reviewed.</p>` : ""}</div>`;
+}
+
+function renderTop() {
+  const flat = [];
+  last.items.forEach((it) => it.issues.filter((i) => i.severity === "high").forEach((i) => flat.push({ it, i })));
+  const box = $("top-fixes");
+  if (!flat.length) { box.innerHTML = ""; return; }
+  const shown = flat.slice(0, 5);
+  box.innerHTML = `<div class="topfix"><h3>Top things to fix first</h3><ol>${shown.map(({ it, i }) => `<li><strong>“${esc(it.text.length > 70 ? it.text.slice(0, 70) + "…" : it.text)}”</strong>
+    <span class="tag">${it.element}</span><br>${esc(i.message)}<br><span class="fixline"><b>Fix:</b> ${esc(i.suggestion)}</span></li>`).join("")}</ol>
+    ${flat.length > 5 ? `<p class="hint small">${flat.length - 5} more high-severity issue${flat.length - 5 === 1 ? "" : "s"} in the full list below.</p>` : ""}</div>`;
 }
 
 function render() {
   renderPage();
+  renderTop();
   const s = last.summary;
   const cats = Object.entries(CATS).map(([k, label]) => `
     <div class="stat"><span>${label}</span><b class="${tone(s.categories[k])}">${s.categories[k]}</b>
@@ -175,10 +190,23 @@ async function scan() {
     const r = await fetch("/api/scan", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url }) });
     const data = await r.json();
     if (!r.ok) throw new Error(data.error || "Scan failed.");
-    last = data; render();
+    last = data; $("f-issues").checked = true; render();
     const res = $("results"); res.hidden = false; res.focus(); res.scrollIntoView({ behavior: "smooth" });
   } catch (e) { showError(e.message); }
   finally { $("scan").disabled = false; $("busy").hidden = true; }
 }
 $("scan").onclick = scan;
 $("url").addEventListener("keydown", (e) => { if (e.key === "Enter") scan(); });
+
+// ---- text size control (remembered between visits)
+const SIZES = [100, 115, 130, 150];
+let sizeIdx = 0;
+try { sizeIdx = Math.min(SIZES.length - 1, Math.max(0, parseInt(localStorage.getItem("uitr-size") || "0", 10) || 0)); } catch (e) {}
+function applySize() {
+  document.documentElement.style.fontSize = SIZES[sizeIdx] + "%";
+  $("size-down").disabled = sizeIdx === 0; $("size-up").disabled = sizeIdx === SIZES.length - 1;
+  try { localStorage.setItem("uitr-size", sizeIdx); } catch (e) {}
+}
+$("size-down").onclick = () => { sizeIdx = Math.max(0, sizeIdx - 1); applySize(); };
+$("size-up").onclick = () => { sizeIdx = Math.min(SIZES.length - 1, sizeIdx + 1); applySize(); };
+applySize();

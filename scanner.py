@@ -19,7 +19,7 @@ MAX_REDIRECTS = 4
 TIMEOUT = 10
 MAX_STRINGS = 250
 MAX_PARAGRAPHS = 40
-UA = "Mozilla/5.0 (compatible; UITextReviewer/1.0; +classroom-project)"
+UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36 UITextReviewer/1.0"
 
 SKIP_TAGS = {"script", "style", "noscript", "template", "svg", "iframe", "canvas", "code", "pre"}
 VOID = {"area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "source", "track", "wbr"}
@@ -95,6 +95,21 @@ def fetch(url: str) -> tuple[str, str]:
 
 
 # ---------------------------------------------------------------- HTML parsing
+def _examples(items, filenames=True):
+    """Short 'For example: a, b, c (+N more)' text. Long URLs are reduced to their last path segment."""
+    out = []
+    for x in items:
+        x = (x or "").split("?")[0].rstrip("/")
+        out.append((x.rsplit("/", 1)[-1] if filenames else x)[:40] or "(unnamed)")
+    out = list(dict.fromkeys(out))
+    more = len(out) - 3
+    return "For example: " + ", ".join(out[:3]) + (f" (+{more} more)" if more > 0 else "") + "."
+
+
+BLOCKED_TITLE = re.compile(r"unsupported|access denied|forbidden|just a moment|attention required|are you a robot|captcha|blocked|"
+                           r"enable javascript|not available|403|security check|please wait", re.I)
+
+
 class _Collector:
     __slots__ = ("tag", "kind", "where", "parts")
 
@@ -136,8 +151,8 @@ class PageParser(HTMLParser):
         self._seen.add(key)
         self.strings.append((text, element, where))
 
-    def _issue(self, severity, message, suggestion, rule):
-        self.page_issues.append({"severity": severity, "message": message, "suggestion": suggestion, "rule": rule})
+    def _issue(self, severity, message, suggestion, rule, detail=""):
+        self.page_issues.append({"severity": severity, "message": message, "detail": detail, "suggestion": suggestion, "rule": rule})
 
     def _push(self, tag, kind, where):
         self.stack.append(_Collector(tag, kind, where))
@@ -279,49 +294,56 @@ class PageParser(HTMLParser):
     # -- page-level findings
     def finalise(self):
         if not self.lang:
-            self._issue("medium", "The page doesn’t declare its language (<html lang>), so screen readers may pronounce text wrongly (WCAG 3.1.1).",
-                        "Add lang=\"en\" (or the right code) to the <html> tag.", "no-lang")
+            self._issue("medium", "The page doesn’t say what language it is in",
+                        "Add lang=\"en\" (or the right code) to the <html> tag.", "no-lang",
+                        detail="Screen readers may pronounce the text wrongly (WCAG 3.1.1).")
         t = re.sub(r"\s+", " ", self.title).strip()
         if not t:
-            self._issue("medium", "The page has no <title>, which is the first thing a screen reader announces and what shows in browser tabs.",
-                        "Add a short, unique title describing the page.", "no-title")
+            self._issue("medium", "The page has no title",
+                        "Add a short, unique title describing the page.", "no-title",
+                        detail="The title is the first thing a screen reader announces and what browser tabs show.")
         elif t.lower() in {"untitled", "document", "home", "index", "new page", "page"}:
-            self._issue("low", f"The page title “{t}” is too generic.", "Use a descriptive title such as “Pricing – Acme”.", "generic-title")
+            self._issue("low", f"The page title “{t[:50]}” is too generic", "Use a descriptive title such as “Pricing – Acme”.", "generic-title")
         if self.imgs_no_alt:
-            ex = ", ".join(s or "(no src)" for s in self.imgs_no_alt[:3])
-            self._issue("high", f"{len(self.imgs_no_alt)} image(s) have no alt attribute (e.g. {ex}) (WCAG 1.1.1).",
-                        "Add short alt text describing the image, or alt=\"\" if it is purely decorative.", "img-no-alt")
+            n = len(self.imgs_no_alt)
+            self._issue("high", f"{n} image{'s' if n != 1 else ''} {'have' if n != 1 else 'has'} no alt text",
+                        "Add a short description to each image, or alt=\"\" if it is only decoration.", "img-no-alt",
+                        detail="Screen readers can’t describe these images (WCAG 1.1.1). " + _examples(self.imgs_no_alt))
         unnamed = [i for i in self.inputs if not (i["named"] or i["wrapped"] or (i["id"] and i["id"] in self.labels_for))]
         if unnamed:
-            ex = ", ".join(i["where"] for i in unnamed[:3])
-            self._issue("high", f"{len(unnamed)} form field(s) have no label (e.g. {ex}); placeholders alone disappear while typing (WCAG 1.3.1 / 3.3.2).",
-                        "Add a visible <label for=…> for every field.", "input-no-label")
+            n = len(unnamed)
+            self._issue("high", f"{n} form field{'s' if n != 1 else ''} {'have' if n != 1 else 'has'} no label",
+                        "Add a visible label to every field. Placeholder text alone disappears while typing.", "input-no-label",
+                        detail="Without a label, screen readers can’t say what to enter (WCAG 1.3.1, 3.3.2). " + _examples([i["where"] for i in unnamed], False))
         if self.empty_buttons:
-            self._issue("high", f"{self.empty_buttons} button(s) have no text or aria-label, so screen readers announce just “button”.",
-                        "Add visible text or an aria-label such as “Close dialog”.", "empty-button")
+            self._issue("high", f"{self.empty_buttons} button{'s' if self.empty_buttons != 1 else ''} with no name",
+                        "Add visible text or an aria-label such as “Close dialog”.", "empty-button",
+                        detail="Screen readers announce these as just “button”.")
         if self.empty_links:
-            self._issue("high", f"{len(self.empty_links)} link(s) have no text or aria-label (e.g. {self.empty_links[0]}).",
-                        "Give each link descriptive text.", "empty-link")
+            self._issue("high", f"{len(self.empty_links)} link{'s' if len(self.empty_links) != 1 else ''} with no name",
+                        "Give each link descriptive text.", "empty-link", detail="Screen readers announce these as just “link”. " + _examples(self.empty_links, False))
         dup = [t for t, hrefs in self.link_targets.items() if len(hrefs) > 1]
         if dup:
-            self._issue("medium", f"Same link text leads to different pages: {', '.join('“' + d + '”' for d in dup[:4])}.",
-                        "Make each link text unique and descriptive.", "dup-link-text")
+            self._issue("medium", "Different pages share the same link text",
+                        "Make each link text unique and descriptive.", "dup-link-text",
+                        detail="Repeated: " + ", ".join("“" + d[:40] + "”" for d in dup[:4]) + ("…" if len(dup) > 4 else ""))
         h1 = self.headings.count(1)
         if self.headings and h1 == 0:
-            self._issue("low", "The page has headings but no main heading (h1).", "Add one h1 that names the page.", "no-h1")
+            self._issue("low", "The page has no main heading (h1)", "Add one h1 that names the page.", "no-h1")
         elif h1 > 1:
-            self._issue("low", f"The page has {h1} h1 headings.", "Use a single h1 and h2–h6 for sub-sections.", "multi-h1")
+            self._issue("low", f"The page has {h1} main headings (h1)", "Use a single h1 and h2–h6 for sub-sections.", "multi-h1")
         skips = [(a, b) for a, b in zip(self.headings, self.headings[1:]) if b > a + 1]
         if skips:
-            self._issue("low", f"Heading levels skip (e.g. h{skips[0][0]} → h{skips[0][1]}), which breaks the outline for screen-reader users.",
-                        "Don’t skip levels; go h1 → h2 → h3.", "heading-skip")
+            self._issue("low", "Heading levels are skipped", "Go in order: h1 → h2 → h3.", "heading-skip",
+                        detail=f"For example h{skips[0][0]} jumps to h{skips[0][1]}, which breaks the page outline for screen-reader users.")
         if re.search(r"user-scalable\s*=\s*(?:no|0)|maximum-scale\s*=\s*1(?:\.0)?\b", self.viewport, re.I):
-            self._issue("medium", "Pinch-zoom is disabled in the viewport tag, which blocks low-vision users from enlarging text (WCAG 1.4.4).",
-                        "Remove user-scalable=no and maximum-scale=1.", "no-zoom")
+            self._issue("medium", "Pinch-zoom is turned off on phones",
+                        "Remove user-scalable=no and maximum-scale=1 from the viewport tag.", "no-zoom",
+                        detail="Low-vision users can’t enlarge the text (WCAG 1.4.4).")
         for text, element, where in self.strings:
             if element == "alt" and (GENERIC_ALT.search(text.strip()) or re.match(r"^(?:image|picture|photo) of\b", text.strip(), re.I)):
-                self._issue("medium", f"Alt text “{text[:50]}” is a file name or redundant wording.",
-                            "Describe what the image shows or why it matters, without “image of”.", "bad-alt")
+                self._issue("medium", f"Alt text “{text[:40]}” isn’t useful",
+                            "Describe what the image shows, without “image of” or a file name.", "bad-alt")
                 break
 
 
@@ -340,7 +362,14 @@ def scan(raw_url: str) -> dict:
     p.finalise()
     if not p.strings:
         raise ScanError("No readable interface text was found. The page may build its content with JavaScript, which this tool can’t run.")
+    title = re.sub(r"\s+", " ", p.title).strip()
+    warning = ""
+    if BLOCKED_TITLE.search(title) or len(p.strings) < 6:
+        warning = ("This website may have blocked our scanner or served a plain fallback page "
+                   "(its page title is “" + title[:60] + "”). The results below describe that page, not the real site. "
+                   "Try another page, or use the Paste text tab.")
     return {
+        "warning": warning,
         "url": final_url,
         "title": re.sub(r"\s+", " ", p.title).strip(),
         "lang": p.lang,

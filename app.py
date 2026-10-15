@@ -41,7 +41,7 @@ def api_scan():
     except ScanError as e:
         return jsonify(error=str(e)), 400
     result = analyse(page["rows"])
-    result["page"] = {k: page[k] for k in ("url", "title", "lang", "page_issues", "truncated")}
+    result["page"] = {k: page[k] for k in ("url", "title", "lang", "page_issues", "truncated", "warning")}
     return jsonify(result)
 
 
