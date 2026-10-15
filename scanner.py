@@ -32,6 +32,13 @@ class ScanError(Exception):
 
 
 # ---------------------------------------------------------------- safe fetching
+# Only genuinely internal ranges are refused. Python's own is_private/is_reserved flags are broader and also
+# catch addresses that VPNs, proxies and some DNS setups hand out for ordinary public sites (e.g. 198.18.0.0/15).
+BLOCKED_NETS = [ipaddress.ip_network(n) for n in (
+    "0.0.0.0/8", "10.0.0.0/8", "127.0.0.0/8", "169.254.0.0/16", "172.16.0.0/12", "192.168.0.0/16",
+    "::1/128", "::/128", "fc00::/7", "fe80::/10")]
+
+
 def _check_host(host: str) -> None:
     if os.environ.get("UITR_ALLOW_PRIVATE") == "1":
         return
@@ -40,9 +47,11 @@ def _check_host(host: str) -> None:
     except socket.gaierror:
         raise ScanError(f"Could not find the website “{host}”. Check the address.")
     for info in infos:
-        ip = ipaddress.ip_address(info[4][0])
-        if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved or ip.is_multicast or ip.is_unspecified:
-            raise ScanError("That address points to a private or internal network, so it can’t be scanned.")
+        ip = ipaddress.ip_address(info[4][0].split("%")[0])
+        if getattr(ip, "ipv4_mapped", None):
+            ip = ip.ipv4_mapped
+        if any(ip in net for net in BLOCKED_NETS):
+            raise ScanError(f"“{host}” resolves to an internal network address ({ip}), so it can’t be scanned.")
 
 
 class _NoRedirect(urllib.request.HTTPRedirectHandler):

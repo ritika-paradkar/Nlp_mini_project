@@ -79,3 +79,19 @@ def test_demo_pages_score_low_and_high():
     assert bad["summary"]["overall"] < 50 < 75 < good["summary"]["overall"]
     assert len(bad["page"]["page_issues"]) >= 8 and len(good["page"]["page_issues"]) == 0
     assert c.get("/demo/bad-site").status_code == 200 and c.get("/demo/nope").status_code == 404
+
+
+def test_host_check_blocks_internal_but_allows_odd_public_ranges(monkeypatch):
+    import socket
+    monkeypatch.delenv("UITR_ALLOW_PRIVATE", raising=False)
+
+    def fake(ip):
+        return lambda host, port: [(socket.AF_INET, 1, 6, "", (ip, 0))]
+
+    for ip in ("10.0.0.5", "192.168.1.1", "127.0.0.1", "169.254.169.254", "172.20.1.1"):
+        monkeypatch.setattr(socket, "getaddrinfo", fake(ip))
+        with pytest.raises(scanner.ScanError):
+            scanner._check_host("x.test")
+    for ip in ("198.18.0.5", "100.64.0.9", "23.45.67.89", "240.0.0.1"):    # VPN / carrier / public ranges
+        monkeypatch.setattr(socket, "getaddrinfo", fake(ip))
+        scanner._check_host("x.test")
