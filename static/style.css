@@ -134,3 +134,4 @@ footer{display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-
 .rewrite{font-size:1rem}.ok-msg{font-size:1rem}.hint{font-size:1rem}.hint.small{font-size:.9rem}
 .tag{font-size:.75rem;color:#444}
 @media print{.sizer{display:none}}
+.linkbtn{font:inherit;background:none;border:0;padding:0;color:var(--ink);text-decoration:underline;cursor:pointer}

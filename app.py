@@ -1,8 +1,10 @@
 """UI Text Accessibility Reviewer - Flask web app."""
 from flask import Flask, jsonify, render_template, request
 
-from analyzer import analyse, parse_input, ELEMENT_TYPES
-from scanner import ScanError, scan
+from analyzer import analyse, parse_input, ELEMENT_TYPES, SEVERITY_PENALTY
+import os
+import re
+from scanner import ScanError, scan, scan_html
 
 app = Flask(__name__)
 MAX_LINES = 500
@@ -33,14 +35,37 @@ def api_analyze():
     return jsonify(analyse(rows))
 
 
+DEMO_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "demo")
+DEMO_RE = re.compile(r"^https?://(?:localhost|127\.0\.0\.1)(?::\d+)?/demo/(bad-site|good-site)/?$", re.I)
+
+
+@app.get("/demo/<name>")
+def demo_page(name):
+    if name not in ("bad-site", "good-site"):
+        return "Not found", 404
+    with open(os.path.join(DEMO_DIR, name + ".html"), encoding="utf-8") as f:
+        return f.read()
+
+
 @app.post("/api/scan")
 def api_scan():
     data = request.get_json(silent=True) or {}
     try:
-        page = scan(data.get("url", ""))
+        m = DEMO_RE.match((data.get("url") or "").strip())
+        if m:                                     # built-in demo pages are read from disk, no network needed
+            with open(os.path.join(DEMO_DIR, m.group(1) + ".html"), encoding="utf-8") as f:
+                page = scan_html(f.read(), data["url"].strip())
+        else:
+            page = scan(data.get("url", ""))
     except ScanError as e:
         return jsonify(error=str(e)), 400
     result = analyse(page["rows"])
+    # Site score = half the average text score, half the page-level checks (which the text scores can't see).
+    penalty = sum(SEVERITY_PENALTY[i["severity"]] for i in page["page_issues"])
+    summary = result["summary"]
+    summary["text_score"] = summary["overall"]
+    summary["page_score"] = max(0, 100 - penalty)
+    summary["overall"] = round((summary["text_score"] + summary["page_score"]) / 2)
     result["page"] = {k: page[k] for k in ("url", "title", "lang", "page_issues", "truncated", "warning")}
     return jsonify(result)
 

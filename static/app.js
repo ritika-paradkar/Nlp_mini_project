@@ -77,6 +77,7 @@ function render() {
   $("summary").innerHTML = `
     <div class="grid">
       <div class="stat"><span>Overall score</span><b class="${tone(s.overall)}">${s.overall}/100</b></div>
+      ${s.page_score != null ? `<div class="stat"><span>Page checks</span><b class="${tone(s.page_score)}">${s.page_score}/100</b><span>text scores ${s.text_score}/100</span></div>` : ""}
       <div class="stat"><span>Strings checked</span><b>${s.total}</b><span>${s.passing} with no issues</span></div>
       <div class="stat"><span>Issues found</span><b>${s.issues.high + s.issues.medium + s.issues.low}</b>
         <span>${s.issues.high} high · ${s.issues.medium} medium · ${s.issues.low} low</span></div>
@@ -210,3 +211,5 @@ function applySize() {
 $("size-down").onclick = () => { sizeIdx = Math.max(0, sizeIdx - 1); applySize(); };
 $("size-up").onclick = () => { sizeIdx = Math.min(SIZES.length - 1, sizeIdx + 1); applySize(); };
 applySize();
+
+document.querySelectorAll("[data-demo]").forEach((b) => b.addEventListener("click", () => { $("url").value = `${location.origin}/demo/${b.dataset.demo}`; scan(); }));

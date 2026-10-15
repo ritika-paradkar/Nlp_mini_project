@@ -70,3 +70,12 @@ def test_api_scan(server):
     assert d["summary"]["total"] > 5 and d["page"]["page_issues"]
     assert any(i["rewrite"] for i in d["items"])
     assert c.post("/api/scan", json={"url": ""}).status_code == 400
+
+
+def test_demo_pages_score_low_and_high():
+    c = app.test_client()
+    bad = c.post("/api/scan", json={"url": "http://localhost:5000/demo/bad-site"}).json
+    good = c.post("/api/scan", json={"url": "http://localhost:5000/demo/good-site"}).json
+    assert bad["summary"]["overall"] < 50 < 75 < good["summary"]["overall"]
+    assert len(bad["page"]["page_issues"]) >= 8 and len(good["page"]["page_issues"]) == 0
+    assert c.get("/demo/bad-site").status_code == 200 and c.get("/demo/nope").status_code == 404

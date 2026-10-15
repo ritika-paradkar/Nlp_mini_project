@@ -347,6 +347,10 @@ class PageParser(HTMLParser):
                 break
 
 
+def scan_html(html: str, final_url: str) -> dict:
+    return _build(final_url, html)
+
+
 def scan(raw_url: str) -> dict:
     url = normalise_url(raw_url)
     typed_scheme = bool(re.match(r"^[a-z][a-z0-9+.-]*://", (raw_url or "").strip(), re.I))
@@ -356,6 +360,10 @@ def scan(raw_url: str) -> dict:
         if typed_scheme or "Could not open" not in str(e):
             raise
         final_url, html = fetch("http://" + url[len("https://"):])     # no scheme typed and https failed: try plain http
+    return _build(final_url, html)
+
+
+def _build(final_url: str, html: str) -> dict:
     p = PageParser(final_url)
     p.feed(html)
     p.close()

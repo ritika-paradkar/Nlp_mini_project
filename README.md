@@ -13,6 +13,8 @@ pytest                 # run tests
 ## Website scan
 Enter a URL on the **Scan a website** tab. `scanner.py` downloads the page (private/internal addresses are blocked), extracts buttons, links, form labels/placeholders, headings, alert messages, alt text and paragraphs, and also reports page-level problems (missing alt text, unlabeled fields, no `lang`, skipped headings, disabled zoom, duplicate link text). Everything is then reviewed by the analyzer below. Pages built entirely with JavaScript will show little text. API: `POST /api/scan` with `{"url": "example.com"}`. For local testing of internal addresses set `UITR_ALLOW_PRIVATE=1`.
 
+Built-in demos (no internet needed): on the Scan tab click “a badly written site” (scores ~40) or “a well written site” (~100). The site score is half the average text score and half the page-level checks.
+
 ## How it works (`analyzer.py`)
 | Dimension | Techniques |
 |---|---|
