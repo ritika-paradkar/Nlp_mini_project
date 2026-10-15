@@ -20,3 +20,11 @@ pytest                 # run tests
 
 Input: one string per line, optionally prefixed `button | …`, `label | …`, `message | …`.
 API: `POST /api/analyze` with `{"text": "...", "default_element": "other"}`.
+
+## Features
+- Per-string scores for clarity, accessibility, reading level and consistency, each with a suggested fix
+- **Suggested rewrites** (plain-word swaps, ALL CAPS → sentence case, tidier punctuation) with one-click copy
+- Flexible input: `button | Save`, `Error message: ...`, `Placeholder - ...`, or plain lines
+- Upload `.txt` / `.csv` files (CSV may be `type,text` rows)
+- Filter by severity / category, sort by score
+- Export results as CSV or JSON, or print / save as PDF

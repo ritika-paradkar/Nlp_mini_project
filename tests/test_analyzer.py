@@ -1,4 +1,4 @@
-from analyzer import analyse, check_item, count_syllables, parse_input, readability
+from analyzer import analyse, check_item, count_syllables, parse_input, readability, suggest_rewrite
 from app import app
 
 
@@ -51,3 +51,16 @@ def test_api():
     r = c.post("/api/analyze", json={"text": "button | Submit\nlabel | Email"})
     assert r.status_code == 200 and r.json["summary"]["total"] == 2
     assert c.get("/").status_code == 200
+
+
+def test_parse_aliases():
+    rows = parse_input("Button label: Click here\nError message: Invalid input\nForm instruction: Fill this in\nPlaceholder - Email")
+    assert [r[1] for r in rows] == ["button", "message", "message", "label"]
+    assert rows[0][0] == "Click here"
+
+
+def test_rewrites():
+    assert suggest_rewrite("CANCEL", "button") == "Cancel"
+    assert suggest_rewrite("Provide it prior to proceeding.", "message") == "Provide it before proceeding."
+    assert suggest_rewrite("Save changes", "button") == ""
+    assert analyse([("CANCEL", "button")])["items"][0]["rewrite"] == "Cancel"

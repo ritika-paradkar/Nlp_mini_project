@@ -97,6 +97,7 @@ class ItemResult:
     reading_ease: float | None
     grade: float | None
     reading_label: str
+    rewrite: str = ""
     scores: dict = field(default_factory=dict)
     score: int = 100
     issues: list = field(default_factory=list)
@@ -353,19 +354,78 @@ def check_consistency(items: list[ItemResult]) -> list[tuple[int, Issue]]:
     return out
 
 
+# ---------------------------------------------------------------- auto-rewrite
+PHRASE_FIXES = [
+    (re.compile(r"\bprior to\b", re.I), "before"),
+    (re.compile(r"\bin order to\b", re.I), "to"),
+    (re.compile(r"\bplease note that\s*", re.I), ""),
+    (re.compile(r"\bdue to the fact that\b", re.I), "because"),
+    (re.compile(r"\bat this point in time\b", re.I), "now"),
+    (re.compile(r"\bit is important to note that\s*", re.I), ""),
+    (re.compile(r"\bkindly\s+", re.I), ""),
+]
+BUTTON_FIXES = {"submit": "Send", "ok": "Got it", "okay": "Got it", "yes": "Yes, continue", "no": "No, go back",
+                "go": "Continue", "done": "Finish", "next": "Next step"}
+
+
+def _match_case(src: str, repl: str) -> str:
+    if src.isupper() and len(src) > 1:
+        return repl.upper()
+    return repl.capitalize() if src[:1].isupper() else repl
+
+
+def suggest_rewrite(text: str, element: str) -> str:
+    """Return a cleaner version of `text`, or '' when nothing can be safely improved."""
+    out = text
+    for rx, repl in PHRASE_FIXES:
+        out = rx.sub(repl, out)
+    out = re.sub(
+        r"[A-Za-z]+",
+        lambda m: _match_case(m.group(0), JARGON[m.group(0).lower()])
+        if m.group(0).lower() in JARGON and " " not in JARGON[m.group(0).lower()] and "/" not in JARGON[m.group(0).lower()]
+        else m.group(0),
+        out,
+    )
+    letters = re.sub(r"[^A-Za-z]", "", out)
+    if len(letters) > 3 and letters.isupper():
+        out = out.capitalize() if element in ("button", "label") else out[:1].upper() + out[1:].lower()
+    out = re.sub(r"!{2,}", "!", out)
+    out = re.sub(r"\?{2,}", "?", out)
+    out = re.sub(r"\.{4,}", "...", out)
+    if element == "message" and out.rstrip().endswith("!") and re.search(r"error|fail|invalid|wrong|problem|couldn", out, re.I):
+        out = out.rstrip()[:-1] + "."
+    if element == "button" and normalise(out) in BUTTON_FIXES:
+        out = BUTTON_FIXES[normalise(out)]
+    out = re.sub(r"\s{2,}", " ", out).strip()
+    if text[:1].isupper() and out[:1].islower():
+        out = out[:1].upper() + out[1:]
+    return out if out != text.strip() and out else ""
+
+
 # ---------------------------------------------------------------- public API
+_BUTTON_KEYS = r"button(?:\s+(?:label|text))?|btn|cta"
+_LABEL_KEYS = r"(?:field|input|form)?\s*label|placeholder|heading|title"
+_MESSAGE_KEYS = (r"(?:error|success|warning|alert|toast|status|validation)?\s*message|error|warning|success|"
+                 r"tooltip|(?:form\s+)?instruction|helper(?:\s+text)?|hint|notification")
+PREFIX_RE = re.compile(rf"^(?:(?P<b>{_BUTTON_KEYS})|(?P<l>{_LABEL_KEYS})|(?P<m>{_MESSAGE_KEYS})|(?P<o>other))\s*[|:>\t-]\s*(?P<t>.+)$", re.I)
+
+
 def parse_input(raw: str, default_element: str = "other") -> list[tuple[str, str]]:
-    """Each line is either `text` or `element | text` (button|label|message|other)."""
+    """Each line is `text` or `<type> | text` / `<type>: text`.
+
+    Understands button|label|message|other plus common aliases such as
+    "Button label:", "Error message:", "Form instruction:", "Placeholder:".
+    """
     rows = []
     for line in raw.splitlines():
         line = line.strip()
         if not line or line.startswith("#"):
             continue
         element = default_element
-        m = re.match(r"^(button|label|message|other|btn|error)\s*[|:>\t]\s*(.+)$", line, re.I)
+        m = PREFIX_RE.match(line)
         if m:
-            element = {"btn": "button", "error": "message"}.get(m.group(1).lower(), m.group(1).lower())
-            line = m.group(2).strip()
+            element = "button" if m.group("b") else "label" if m.group("l") else "message" if m.group("m") else "other"
+            line = m.group("t").strip()
         rows.append((line, element))
     return rows
 
@@ -380,6 +440,7 @@ def analyse(rows: list[tuple[str, str]]) -> dict:
         item = ItemResult(id=idx, text=text, element=element, word_count=n,
                           reading_ease=ease, grade=grade, reading_label=reading_label(ease))
         item.issues = check_item(text, element)
+        item.rewrite = suggest_rewrite(text, element)
         ri = reading_issue(element, ease, grade, n)
         if ri:
             item.issues.append(ri)

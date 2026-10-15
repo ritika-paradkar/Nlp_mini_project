@@ -57,7 +57,7 @@
   <section id="analyzer" class="wrap">
     <h2 class="section">Analyzer</h2>
     <div class="narrow">
-      <p class="hint">Enter one string per line. Optionally start a line with its type: <code>button | Save</code>, <code>label | Email</code> or <code>message | Error 404</code>. Lines starting with <code>#</code> are ignored.</p>
+      <p class="hint">Enter one string per line. Optionally start a line with its type: <code>button | Save</code>, <code>label | Email</code> or <code>message | Error 404</code> (a colon works too, and so do names like <code>Button label:</code> or <code>Error message:</code>). Lines starting with <code>#</code> are ignored.</p>
       <label for="default-el">Type for lines without a prefix</label>
       <select id="default-el">
         <option value="other">Other / auto</option>
@@ -70,8 +70,11 @@
       <div class="row">
         <button id="analyze" class="btn" type="button">Analyze text</button>
         <button id="sample" class="btn btn-ghost" type="button">Load sample</button>
+        <label class="btn btn-ghost file-btn" for="file">Upload .txt / .csv</label>
+        <input id="file" type="file" accept=".txt,.csv,.md,text/plain,text/csv" hidden>
         <button id="clear" class="btn btn-ghost" type="button">Clear</button>
       </div>
+      <p class="hint small" id="line-count">0 lines</p>
       <p id="error" role="alert" class="error" hidden></p>
     </div>
 
@@ -83,8 +86,15 @@
         <select id="f-sev"><option value="all">All</option><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select>
         <label for="f-cat">Category</label>
         <select id="f-cat"><option value="all">All</option><option value="clarity">Clarity</option><option value="accessibility">Accessibility</option><option value="reading">Reading level</option><option value="consistency">Consistency</option></select>
+        <label for="f-sort">Sort</label>
+        <select id="f-sort"><option value="order">Original order</option><option value="worst">Lowest score first</option><option value="best">Highest score first</option></select>
         <label class="inline"><input type="checkbox" id="f-issues"> Only strings with issues</label>
+      </div>
+      <div class="row export-row">
+        <button id="copy-fixes" class="btn btn-ghost" type="button">Copy all suggested rewrites</button>
+        <button id="export-csv" class="btn btn-ghost" type="button">Export CSV</button>
         <button id="export" class="btn btn-ghost" type="button">Export JSON</button>
+        <button id="print" class="btn btn-ghost" type="button">Print / Save PDF</button>
       </div>
       <div id="items"></div>
     </div>
