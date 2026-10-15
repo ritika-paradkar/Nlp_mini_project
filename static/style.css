@@ -135,3 +135,5 @@ footer{display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-
 .tag{font-size:.75rem;color:#444}
 @media print{.sizer{display:none}}
 .linkbtn{font:inherit;background:none;border:0;padding:0;color:var(--ink);text-decoration:underline;cursor:pointer}
+.jsbox{margin:12px 0 4px;font-weight:500;font-size:.95rem}
+.note{background:#eaf2ff;border:1px solid #b9d0f5;border-radius:8px;padding:12px 16px;margin-bottom:16px;color:#17365f}

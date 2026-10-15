@@ -59,6 +59,69 @@ class _NoRedirect(urllib.request.HTTPRedirectHandler):
         return None
 
 
+INSTALL_HINT = "Install it once with:  python -m pip install playwright   then   python -m playwright install chromium"
+HIDE_JS = """() => { document.querySelectorAll('script,style,noscript,template').forEach(e => e.remove());
+  document.querySelectorAll('body *').forEach(e => { try { if (getComputedStyle(e).display === 'none') e.remove(); } catch (_) {} });
+  return document.documentElement.outerHTML; }"""
+
+
+def _render(url: str | None = None, html: str | None = None, base_url: str = "") -> tuple[str, str]:
+    """Open the page in headless Chromium so its JavaScript runs; return (final_url, rendered_html).
+
+    Every network request the page makes is checked, so JavaScript can't be used to reach internal addresses."""
+    try:
+        from playwright.sync_api import sync_playwright
+    except ImportError:
+        raise ScanError("Reading JavaScript-built pages needs the optional Playwright add-on. " + INSTALL_HINT)
+
+    host_ok: dict[str, bool] = {}
+
+    def route(r):
+        u = urllib.parse.urlsplit(r.request.url)
+        if u.scheme in ("data", "blob", "about"):
+            return r.continue_()
+        if u.scheme not in ("http", "https") or r.request.resource_type in ("image", "media", "font"):
+            return r.abort()
+        if u.hostname not in host_ok:
+            try:
+                _check_host(u.hostname)
+                host_ok[u.hostname] = True
+            except ScanError:
+                host_ok[u.hostname] = False
+        return r.continue_() if host_ok[u.hostname] else r.abort()
+
+    try:
+        with sync_playwright() as pw:
+            exe = os.environ.get("UITR_CHROMIUM_PATH") or None
+            try:
+                browser = pw.chromium.launch(executable_path=exe)
+            except Exception:
+                raise ScanError("The browser used for JavaScript pages isn’t installed. " + INSTALL_HINT)
+            try:
+                ctx = browser.new_context(user_agent=UA, viewport={"width": 1280, "height": 900}, accept_downloads=False,
+                                          locale="en-US", service_workers="block")
+                page = ctx.new_page()
+                page.route("**/*", route)
+                page.set_default_timeout(20000)
+                if html is not None:
+                    page.set_content(html, wait_until="load")
+                else:
+                    page.goto(url, wait_until="domcontentloaded")
+                try:
+                    page.wait_for_load_state("networkidle", timeout=8000)
+                except Exception:
+                    pass                                    # busy pages never go idle; use what has rendered
+                page.wait_for_timeout(1200)
+                return page.url if html is None else base_url, page.evaluate(HIDE_JS)
+            finally:
+                browser.close()
+    except ScanError:
+        raise
+    except Exception as e:
+        msg = str(e).splitlines()[0][:160] if str(e) else type(e).__name__
+        raise ScanError(f"Could not load the page in the browser ({msg}).")
+
+
 def normalise_url(raw: str) -> str:
     raw = (raw or "").strip()
     if not raw:
@@ -356,20 +419,54 @@ class PageParser(HTMLParser):
                 break
 
 
-def scan_html(html: str, final_url: str) -> dict:
-    return _build(final_url, html)
+def scan_html(html: str, final_url: str, run_js: bool = False) -> dict:
+    """Review HTML we already have (used by the built-in demo pages)."""
+    if run_js:
+        _, html = _render(html=html, base_url=final_url)
+    out = _build(final_url, html)
+    out["rendered"] = run_js
+    return out
 
 
-def scan(raw_url: str) -> dict:
+def scan(raw_url: str, js: str = "auto") -> dict:
+    """js: 'never' = HTML only, 'auto' = fall back to a real browser when the HTML has little text, 'always' = browser first."""
     url = normalise_url(raw_url)
+    if js == "always":
+        final_url, html = _render(url)
+        out = _build(final_url, html)
+        out["rendered"] = True
+        return out
+
     typed_scheme = bool(re.match(r"^[a-z][a-z0-9+.-]*://", (raw_url or "").strip(), re.I))
+    static_err = None
     try:
-        final_url, html = fetch(url)
+        try:
+            final_url, html = fetch(url)
+        except ScanError as e:
+            if typed_scheme or "Could not open" not in str(e):
+                raise
+            final_url, html = fetch("http://" + url[len("https://"):])    # no scheme typed and https failed: try plain http
+        out = _build(final_url, html)
+        out["rendered"] = False
+        if js == "never" or len(out["rows"]) >= 8:
+            return out
+        static_err = out                                    # thin result: maybe a JavaScript-built page
     except ScanError as e:
-        if typed_scheme or "Could not open" not in str(e):
+        if js == "never":
             raise
-        final_url, html = fetch("http://" + url[len("https://"):])     # no scheme typed and https failed: try plain http
-    return _build(final_url, html)
+        static_err = e
+    try:                                                    # auto mode: try again in a real browser
+        final_url, html = _render(url)
+        out = _build(final_url, html)
+        out["rendered"] = True
+        return out
+    except ScanError as render_err:
+        if isinstance(static_err, dict):
+            if "Playwright" in str(render_err) or "isn’t installed" in str(render_err):
+                static_err["warning"] = ("Very little text was found, so this page probably builds its content with JavaScript. "
+                                         + str(render_err))
+            return static_err
+        raise static_err if "Playwright" not in str(render_err) and "isn’t installed" not in str(render_err) else render_err
 
 
 def _build(final_url: str, html: str) -> dict:
@@ -378,7 +475,7 @@ def _build(final_url: str, html: str) -> dict:
     p.close()
     p.finalise()
     if not p.strings:
-        raise ScanError("No readable interface text was found. The page may build its content with JavaScript, which this tool can’t run.")
+        raise ScanError("No readable interface text was found. The page may build its content with JavaScript (turn on “Run the page’s JavaScript first”) or may block automated tools.")
     title = re.sub(r"\s+", " ", p.title).strip()
     warning = ""
     if BLOCKED_TITLE.search(title) or len(p.strings) < 6:

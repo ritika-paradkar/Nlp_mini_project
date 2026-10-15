@@ -74,10 +74,12 @@
           <input id="url" type="text" inputmode="url" autocomplete="url" placeholder="https://example.com" spellcheck="false">
           <button id="scan" class="btn" type="button">Scan website</button>
         </div>
+        <label class="inline jsbox"><input type="checkbox" id="js-always"> Run the page’s JavaScript first <span class="hint small">(slower — for web apps like ChatGPT)</span></label>
         <p class="hint small demo-row">No site handy? Try a demo:
           <button type="button" class="linkbtn" data-demo="bad-site">a badly written site</button> ·
-          <button type="button" class="linkbtn" data-demo="good-site">a well written site</button></p>
-        <p class="hint small">Only the page’s HTML is read. Pages that build their content with JavaScript may show little text, and private or internal addresses can’t be scanned.</p>
+          <button type="button" class="linkbtn" data-demo="good-site">a well written site</button> ·
+          <button type="button" class="linkbtn" data-demo="js-site">a JavaScript-built app</button></p>
+        <p class="hint small">If a page has little text in its HTML, we automatically open it in a headless browser so its JavaScript runs. Pages behind a login show only their public part, and private or internal addresses can’t be scanned.</p>
       </div>
 
       <div id="panel-text" role="tabpanel" aria-labelledby="tab-text" hidden>
@@ -101,7 +103,7 @@
         <p class="hint small" id="line-count">0 lines</p>
       </div>
       <p id="error" role="alert" class="error" hidden></p>
-      <p id="busy" role="status" class="hint" hidden>Scanning the website…</p>
+      <p id="busy" role="status" class="hint" hidden>Scanning the website… pages that need JavaScript can take up to 30 seconds.</p>
     </div>
 
     <div id="results" aria-live="polite" tabindex="-1" hidden>

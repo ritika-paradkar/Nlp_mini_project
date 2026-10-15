@@ -50,7 +50,7 @@ function renderPage() {
   const issues = pg.page_issues.slice().sort((x, y) => order[x.severity] - order[y.severity]);
   const li = issues.map((i) => `<li class="${i.severity}"><div class="li-head"><span class="sev ${i.severity}">${i.severity}</span> <strong>${esc(i.message)}</strong></div>
     ${i.detail ? `<p class="detail">${esc(i.detail)}</p>` : ""}<p class="fixline"><b>Fix:</b> ${esc(i.suggestion)}</p></li>`).join("");
-  box.innerHTML = `${pg.warning ? `<div class="warn" role="alert"><b>Heads up:</b> ${esc(pg.warning)}</div>` : ""}
+  box.innerHTML = `${pg.rendered ? `<div class="note"><b>Rendered with JavaScript:</b> this page was opened in a browser so text created by scripts is included.</div>` : ""}${pg.warning ? `<div class="warn" role="alert"><b>Heads up:</b> ${esc(pg.warning)}</div>` : ""}
     <div class="pageinfo"><h3>${esc(pg.title || "Untitled page")}</h3><p class="url">${esc(pg.url)}${pg.lang ? " · language: " + esc(pg.lang) : ""}</p>
     <h4>Page-level checks <span class="count">${issues.length}</span></h4>${li ? `<ul>${li}</ul>` : `<p class="ok-msg">✓ No page-level problems found</p>`}
     ${pg.truncated ? `<p class="hint small">Only the first ${last.items.length} strings were reviewed.</p>` : ""}</div>`;
@@ -188,7 +188,7 @@ async function scan() {
   if (!url) return showError("Please enter a website address.");
   $("scan").disabled = true; $("busy").hidden = false;
   try {
-    const r = await fetch("/api/scan", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url }) });
+    const r = await fetch("/api/scan", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url, js: $("js-always").checked ? "always" : "auto" }) });
     const data = await r.json();
     if (!r.ok) throw new Error(data.error || "Scan failed.");
     last = data; $("f-issues").checked = true; render();

@@ -36,12 +36,13 @@ def api_analyze():
 
 
 DEMO_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "demo")
-DEMO_RE = re.compile(r"^https?://(?:localhost|127\.0\.0\.1)(?::\d+)?/demo/(bad-site|good-site)/?$", re.I)
+DEMOS = ("bad-site", "good-site", "js-site")
+DEMO_RE = re.compile(r"^https?://(?:localhost|127\.0\.0\.1)(?::\d+)?/demo/(" + "|".join(DEMOS) + r")/?$", re.I)
 
 
 @app.get("/demo/<name>")
 def demo_page(name):
-    if name not in ("bad-site", "good-site"):
+    if name not in DEMOS:
         return "Not found", 404
     with open(os.path.join(DEMO_DIR, name + ".html"), encoding="utf-8") as f:
         return f.read()
@@ -54,9 +55,10 @@ def api_scan():
         m = DEMO_RE.match((data.get("url") or "").strip())
         if m:                                     # built-in demo pages are read from disk, no network needed
             with open(os.path.join(DEMO_DIR, m.group(1) + ".html"), encoding="utf-8") as f:
-                page = scan_html(f.read(), data["url"].strip())
+                page = scan_html(f.read(), data["url"].strip(), run_js=(m.group(1) == "js-site" and data.get("js") != "never"))
         else:
-            page = scan(data.get("url", ""))
+            mode = data.get("js", "auto")
+            page = scan(data.get("url", ""), mode if mode in ("auto", "always", "never") else "auto")
     except ScanError as e:
         return jsonify(error=str(e)), 400
     result = analyse(page["rows"])
@@ -66,7 +68,7 @@ def api_scan():
     summary["text_score"] = summary["overall"]
     summary["page_score"] = max(0, 100 - penalty)
     summary["overall"] = round((summary["text_score"] + summary["page_score"]) / 2)
-    result["page"] = {k: page[k] for k in ("url", "title", "lang", "page_issues", "truncated", "warning")}
+    result["page"] = {k: page[k] for k in ("url", "title", "lang", "page_issues", "truncated", "warning", "rendered")}
     return jsonify(result)
 
 

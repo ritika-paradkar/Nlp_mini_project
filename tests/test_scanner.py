@@ -95,3 +95,28 @@ def test_host_check_blocks_internal_but_allows_odd_public_ranges(monkeypatch):
     for ip in ("198.18.0.5", "100.64.0.9", "23.45.67.89", "240.0.0.1"):    # VPN / carrier / public ranges
         monkeypatch.setattr(socket, "getaddrinfo", fake(ip))
         scanner._check_host("x.test")
+
+
+import os
+needs_browser = pytest.mark.skipif(not os.path.exists(os.environ.get("UITR_CHROMIUM_PATH", "/opt/pw-browsers/chromium")),
+                                   reason="headless Chromium not available")
+
+
+@needs_browser
+def test_js_built_page_needs_rendering(monkeypatch):
+    monkeypatch.setenv("UITR_CHROMIUM_PATH", os.environ.get("UITR_CHROMIUM_PATH", "/opt/pw-browsers/chromium"))
+    c = app.test_client()
+    html_only = c.post("/api/scan", json={"url": "http://localhost:5000/demo/js-site", "js": "never"})
+    assert html_only.status_code == 400                                  # nothing in the raw HTML
+    d = c.post("/api/scan", json={"url": "http://localhost:5000/demo/js-site", "js": "always"}).json
+    texts = {i["text"] for i in d["items"]}
+    assert d["page"]["rendered"] and "Pixel Chat" in texts and "SEND" in texts
+    assert {i["rule"] for i in d["page"]["page_issues"]} >= {"img-no-alt", "empty-button", "input-no-label"}
+
+
+@needs_browser
+def test_render_blocks_internal_requests(monkeypatch):
+    monkeypatch.delenv("UITR_ALLOW_PRIVATE", raising=False)
+    monkeypatch.setenv("UITR_CHROMIUM_PATH", os.environ.get("UITR_CHROMIUM_PATH", "/opt/pw-browsers/chromium"))
+    with pytest.raises(scanner.ScanError):
+        scanner.scan("http://127.0.0.1:9/", "always")

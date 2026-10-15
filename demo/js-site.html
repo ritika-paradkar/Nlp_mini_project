@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+<head><title>Pixel Chat – built with JavaScript</title><meta name="viewport" content="width=device-width, initial-scale=1"></head>
+<body>
+<div id="root"></div>
+<noscript>Please enable JavaScript to run this app.</noscript>
+<script>
+  // Nothing exists in the HTML: the whole interface is created here, like a React or ChatGPT-style app.
+  setTimeout(() => {
+    document.getElementById("root").innerHTML = `
+      <h1>Pixel Chat</h1>
+      <p>Ask a question and get an answer in seconds. Your chats stay private on your device.</p>
+      <nav><a href="/new">New chat</a> <a href="/history">Click here</a> <a href="/help">Read more</a></nav>
+      <form>
+        <input type="text" placeholder="Message">
+        <button>SEND</button><button></button><button>Upload file</button>
+      </form>
+      <div role="alert">Error: request failed (HTTP 500)</div>
+      <img src="avatar.png">`;
+  }, 300);
+</script>
+</body>
+</html>
